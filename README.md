@@ -7,15 +7,12 @@ Frontend repo: `../NH_MDM`
 ## Setup
 
 ```sh
-python -m venv .venv
+py -m venv .venv
 
-# Windows
-.venv\Scripts\activate
-
-# macOS / Linux
-source .venv/bin/activate
+source venv/Scripts/activate
 
 pip install -r requirements.txt
+
 cp .env.example .env
 ```
 
