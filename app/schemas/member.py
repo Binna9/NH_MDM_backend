@@ -16,8 +16,8 @@ class MemberItem(BaseModel):
 
 class MemberCreateItem(BaseModel):
     nh_member_name: str = Field(min_length=1, max_length=50)
-    nh_member_ssn: str = Field(min_length=1, max_length=12)
-    nh_customer_no: str = Field(min_length=1, max_length=12)
+    nh_member_ssn: str = Field(min_length=1, max_length=8)
+    nh_customer_no: str = Field(min_length=1, max_length=10)
     nh_member_phone: str = Field(min_length=1, max_length=13)
 
 
@@ -50,8 +50,8 @@ class MemberBulkDeleteResponse(BaseModel):
 
 class MemberUpdateRequest(BaseModel):
     nh_member_name: str | None = Field(default=None, min_length=1, max_length=50)
-    nh_member_ssn: str | None = Field(default=None, min_length=12, max_length=12)
-    nh_customer_no: str | None = Field(default=None, min_length=12, max_length=12)
+    nh_member_ssn: str | None = Field(default=None, min_length=8, max_length=8)
+    nh_customer_no: str | None = Field(default=None, min_length=10, max_length=10)
     nh_member_phone: str | None = Field(default=None, min_length=13, max_length=13)
     is_active: Literal["Y", "N"] | None = None
 

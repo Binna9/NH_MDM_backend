@@ -1,11 +1,14 @@
 import math
 import uuid
 
+import jwt
 from sqlalchemy import func, or_, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
+from app.core.config import get_settings
 from app.models.nh_member_info import NhMemberInfo
+from app.schemas.auth import MemberLoginResponse
 from app.schemas.member import (
     MemberBulkCreateResponse,
     MemberBulkDeleteResponse,
@@ -17,8 +20,43 @@ from app.schemas.member import (
     MemberUpdateRequest,
 )
 
+settings = get_settings()
+
+def authenticate_member(
+    db: Session,
+    *,
+    nh_member_name: str,
+    ssn_front: str,
+    ssn_back: str,
+) -> MemberLoginResponse | None:
+    ssn = f"{ssn_front}-{ssn_back}"
+    member = db.scalar(
+        select(NhMemberInfo).where(
+            NhMemberInfo.nh_member_name == nh_member_name.strip(),
+            NhMemberInfo.nh_member_ssn == ssn,
+            NhMemberInfo.is_active == "Y",
+        )
+    )
+    if member is None:
+        return None
+
+    payload = {"sub": member.nh_member_id, "name": member.nh_member_name}
+    token = jwt.encode(payload, settings.jwt_secret_key, algorithm=settings.jwt_algorithm)
+
+    return MemberLoginResponse(
+        access_token=token,
+        nh_member_id=member.nh_member_id,
+        nh_member_name=member.nh_member_name,
+        nh_customer_no=member.nh_customer_no,
+    )
+
+
 def get_member_by_id(db: Session, nh_member_id: str) -> NhMemberInfo | None:
     return db.get(NhMemberInfo, nh_member_id)
+
+
+def get_member_by_customer_no(db: Session, nh_customer_no: str) -> NhMemberInfo | None:
+    return db.scalar(select(NhMemberInfo).where(NhMemberInfo.nh_customer_no == nh_customer_no))
 
 
 def check_member_duplicate(

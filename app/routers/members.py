@@ -29,6 +29,7 @@ from app.services.member_service import (
     check_member_duplicate,
     create_members_batch,
     delete_members_batch,
+    get_member_by_customer_no,
     search_members,
     update_member,
 )
@@ -173,6 +174,17 @@ async def validate_members_excel(
         return validate_member_excel(db, workbook_bytes)
     except ValueError as exc:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+
+
+@router.get("/customer-no/{nh_customer_no}", response_model=MemberItem)
+def get_member_by_no(
+    nh_customer_no: str,
+    db: Annotated[Session, Depends(get_db)],
+) -> MemberItem:
+    member = get_member_by_customer_no(db, nh_customer_no)
+    if member is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Member not found")
+    return MemberItem.model_validate(member)
 
 
 @router.patch("/{nh_member_id}", response_model=MemberItem)

@@ -156,12 +156,12 @@ def _validate_row(row: ParsedMemberRow) -> str | None:
         return "성명은 50자 이하여야 합니다."
     if not row.nh_member_ssn:
         return "실명번호는 필수입니다."
-    if len(row.nh_member_ssn) > 12:
-        return "실명번호는 12자 이하여야 합니다."
+    if len(row.nh_member_ssn) > 8:
+        return "실명번호는 8자 이하여야 합니다."
     if not row.nh_customer_no:
         return "고객번호는 필수입니다."
-    if len(row.nh_customer_no) > 12:
-        return "고객번호는 12자 이하여야 합니다."
+    if len(row.nh_customer_no) > 10:
+        return "고객번호는 10자 이하여야 합니다."
     if not row.nh_member_phone:
         return "핸드폰은 필수입니다."
     if len(row.nh_member_phone) > 13:

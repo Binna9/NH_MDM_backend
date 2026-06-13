@@ -6,3 +6,4 @@ sqlalchemy
 psycopg[binary]
 openpyxl
 python-multipart
+PyJWT

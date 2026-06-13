@@ -17,7 +17,7 @@ class NhMemberInfo(Base):
         server_default=text("gen_random_uuid()::text"),
     )
     nh_member_name: Mapped[str] = mapped_column(String(50), nullable=False)
-    nh_member_ssn: Mapped[str] = mapped_column(String(12), nullable=False, unique=True)
-    nh_customer_no: Mapped[str] = mapped_column(String(12), nullable=False, unique=True)
+    nh_member_ssn: Mapped[str] = mapped_column(String(8), nullable=False, unique=True)
+    nh_customer_no: Mapped[str] = mapped_column(String(10), nullable=False, unique=True)
     nh_member_phone: Mapped[str] = mapped_column(String(13), nullable=False)
     is_active: Mapped[str] = mapped_column(String(1), nullable=False, default="Y")
