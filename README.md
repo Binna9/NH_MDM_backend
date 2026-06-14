@@ -20,6 +20,9 @@ cp .env.example .env
 
 ```sh
 uvicorn app.main:app --reload
+## 전역으로 열기 
+uvicorn app.main:app --host 0.0.0.0 --port 8000 
+
 ```
 
 Default API URLs:
