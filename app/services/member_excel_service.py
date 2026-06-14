@@ -1,12 +1,17 @@
 import io
+import logging
 import uuid
+import zipfile
 from dataclasses import dataclass
 
 from openpyxl import Workbook, load_workbook
+from openpyxl.styles import Alignment, Border, Font, PatternFill, Side
 from openpyxl.worksheet.worksheet import Worksheet
 from sqlalchemy import select
-from sqlalchemy.exc import IntegrityError
+from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 from sqlalchemy.orm import Session
+
+logger = logging.getLogger(__name__)
 
 from app.models.nh_member_info import NhMemberInfo
 from app.schemas.member import MemberExcelUploadError, MemberExcelUploadResponse, MemberExcelValidateResponse
@@ -25,6 +30,40 @@ HEADER_TO_FIELD = {
     "핸드폰": "nh_member_phone",
 }
 
+COLUMN_WIDTHS = (8, 14, 16, 14, 16)
+
+_HEADER_FILL = PatternFill("solid", fgColor="1F6B2E")
+_ROW_FILL_ODD = PatternFill("solid", fgColor="FFFFFF")
+_ROW_FILL_EVEN = PatternFill("solid", fgColor="EDF7EE")
+_HEADER_FONT = Font(name="맑은 고딕", bold=True, color="FFFFFF", size=10)
+_DATA_FONT = Font(name="맑은 고딕", size=10)
+_CENTER = Alignment(horizontal="center", vertical="center", wrap_text=False)
+_THIN = Side(style="thin", color="BDBDBD")
+_BORDER = Border(left=_THIN, right=_THIN, top=_THIN, bottom=_THIN)
+
+
+def _style_sheet(sheet: Worksheet, data_row_count: int = 0) -> None:
+    for col_idx, width in enumerate(COLUMN_WIDTHS, start=1):
+        sheet.column_dimensions[sheet.cell(row=1, column=col_idx).column_letter].width = width
+
+    sheet.row_dimensions[HEADER_ROW].height = 22
+    for col_idx in range(1, len(EXCEL_HEADERS) + 1):
+        cell = sheet.cell(row=HEADER_ROW, column=col_idx)
+        cell.fill = _HEADER_FILL
+        cell.font = _HEADER_FONT
+        cell.alignment = _CENTER
+        cell.border = _BORDER
+
+    for row_idx in range(DATA_START_ROW, DATA_START_ROW + data_row_count):
+        fill = _ROW_FILL_EVEN if row_idx % 2 == 0 else _ROW_FILL_ODD
+        sheet.row_dimensions[row_idx].height = 18
+        for col_idx in range(1, len(EXCEL_HEADERS) + 1):
+            cell = sheet.cell(row=row_idx, column=col_idx)
+            cell.fill = fill
+            cell.font = _DATA_FONT
+            cell.alignment = _CENTER
+            cell.border = _BORDER
+
 
 @dataclass
 class ParsedMemberRow:
@@ -42,6 +81,8 @@ def build_member_excel_template() -> bytes:
 
     for column_index, header in enumerate(EXCEL_HEADERS, start=1):
         sheet.cell(row=HEADER_ROW, column=column_index, value=header)
+
+    _style_sheet(sheet, data_row_count=0)
 
     buffer = io.BytesIO()
     workbook.save(buffer)
@@ -92,6 +133,8 @@ def build_member_excel_export(
             ]
         )
 
+    _style_sheet(sheet, data_row_count=len(members))
+
     buffer = io.BytesIO()
     workbook.save(buffer)
     return buffer.getvalue()
@@ -115,15 +158,26 @@ def _parse_header_map(sheet: Worksheet) -> dict[str, int]:
 
     missing_headers = [header for header in REQUIRED_DATA_HEADERS if header not in header_map]
     if missing_headers:
-        raise ValueError(f"Missing required headers: {', '.join(missing_headers)}")
+        raise ValueError(f"필수 헤더가 없습니다: {', '.join(missing_headers)}")
 
     return header_map
 
 
 def _parse_member_rows(workbook_bytes: bytes) -> list[ParsedMemberRow]:
-    workbook = load_workbook(io.BytesIO(workbook_bytes), data_only=True)
-    sheet = workbook.active
-    header_map = _parse_header_map(sheet)
+    try:
+        workbook = load_workbook(io.BytesIO(workbook_bytes), data_only=True)
+    except zipfile.BadZipFile:
+        raise ValueError("올바른 엑셀 파일(.xlsx)이 아닙니다. 파일을 확인해 주세요.")
+    except Exception as exc:
+        raise ValueError(f"엑셀 파일을 열 수 없습니다: {exc}") from exc
+
+    try:
+        sheet = workbook.active
+        header_map = _parse_header_map(sheet)
+    except ValueError:
+        raise
+    except Exception as exc:
+        raise ValueError(f"엑셀 헤더를 읽는 중 오류가 발생했습니다: {exc}") from exc
 
     parsed_rows: list[ParsedMemberRow] = []
     for row_number in range(DATA_START_ROW, sheet.max_row + 1):
@@ -169,49 +223,34 @@ def _validate_row(row: ParsedMemberRow) -> str | None:
     return None
 
 
-def _find_member_for_upsert(
-    db: Session,
-    nh_member_ssn: str,
-    nh_customer_no: str,
-) -> tuple[NhMemberInfo | None, str | None]:
-    by_ssn = db.scalar(select(NhMemberInfo).where(NhMemberInfo.nh_member_ssn == nh_member_ssn))
-    by_customer_no = db.scalar(
-        select(NhMemberInfo).where(NhMemberInfo.nh_customer_no == nh_customer_no)
+def upsert_member_row(db: Session, row: ParsedMemberRow) -> str:
+    existing = db.scalar(
+        select(NhMemberInfo).where(NhMemberInfo.nh_customer_no == row.nh_customer_no)
     )
 
-    if by_ssn and by_customer_no and by_ssn.nh_member_id != by_customer_no.nh_member_id:
-        return None, "실명번호와 고객번호가 서로 다른 조합원에 매칭됩니다."
+    action = "updated" if existing else "inserted"
 
-    return by_ssn or by_customer_no, None
+    if existing:
+        db.delete(existing)
+        db.flush()
 
-
-def upsert_member_row(db: Session, row: ParsedMemberRow) -> str:
-    member, conflict_message = _find_member_for_upsert(db, row.nh_member_ssn, row.nh_customer_no)
-    if conflict_message:
-        raise ValueError(conflict_message)
-
-    if member is None:
-        member = NhMemberInfo(
-            nh_member_id=str(uuid.uuid4()),
-            nh_member_name=row.nh_member_name,
-            nh_member_ssn=row.nh_member_ssn,
-            nh_customer_no=row.nh_customer_no,
-            nh_member_phone=row.nh_member_phone,
-            is_active="Y",
-        )
-        db.add(member)
-        action = "inserted"
-    else:
-        member.nh_member_name = row.nh_member_name
-        member.nh_member_ssn = row.nh_member_ssn
-        member.nh_customer_no = row.nh_customer_no
-        member.nh_member_phone = row.nh_member_phone
-        action = "updated"
+    member = NhMemberInfo(
+        nh_member_id=str(uuid.uuid4()),
+        nh_member_name=row.nh_member_name,
+        nh_member_ssn=row.nh_member_ssn,
+        nh_customer_no=row.nh_customer_no,
+        nh_member_phone=row.nh_member_phone,
+        is_active="Y",
+    )
+    db.add(member)
 
     try:
         db.flush()
     except IntegrityError as exc:
-        raise ValueError("실명번호 또는 고객번호가 다른 조합원과 중복됩니다.") from exc
+        raise ValueError(f"실명번호 또는 고객번호가 다른 조합원과 중복됩니다. (고객번호: {row.nh_customer_no})") from exc
+    except SQLAlchemyError as exc:
+        logger.exception("DB 오류 발생 (행 %d)", row.row_number)
+        raise ValueError(f"데이터베이스 오류가 발생했습니다: {exc}") from exc
 
     return action
 
@@ -250,15 +289,13 @@ def validate_member_excel(db: Session, workbook_bytes: bytes) -> MemberExcelVali
             errors.append(MemberExcelUploadError(row=row.row_number, message=in_file_error))
             continue
 
-        member, conflict_message = _find_member_for_upsert(db, row.nh_member_ssn, row.nh_customer_no)
-        if conflict_message:
-            errors.append(MemberExcelUploadError(row=row.row_number, message=conflict_message))
-            continue
-
-        if member is None:
-            would_insert += 1
-        else:
+        existing = db.scalar(
+            select(NhMemberInfo).where(NhMemberInfo.nh_customer_no == row.nh_customer_no)
+        )
+        if existing:
             would_update += 1
+        else:
+            would_insert += 1
 
         seen_ssn[row.nh_member_ssn] = row.row_number
         seen_customer_no[row.nh_customer_no] = row.row_number

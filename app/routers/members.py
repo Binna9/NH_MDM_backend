@@ -1,8 +1,11 @@
+import logging
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile, status
 from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
+
+logger = logging.getLogger(__name__)
 
 from app.core.database import get_db
 from app.schemas.member import (
@@ -153,6 +156,12 @@ async def upload_members_excel(
         return upload_member_excel(db, workbook_bytes)
     except ValueError as exc:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+    except Exception as exc:
+        logger.exception("엑셀 업로드 중 예기치 못한 오류 발생")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"서버 오류가 발생했습니다: {exc}",
+        ) from exc
 
 
 @router.post("/excel/validate", response_model=MemberExcelValidateResponse)
@@ -174,6 +183,12 @@ async def validate_members_excel(
         return validate_member_excel(db, workbook_bytes)
     except ValueError as exc:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+    except Exception as exc:
+        logger.exception("엑셀 검증 중 예기치 못한 오류 발생")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"서버 오류가 발생했습니다: {exc}",
+        ) from exc
 
 
 @router.get("/customer-no/{nh_customer_no}", response_model=MemberItem)

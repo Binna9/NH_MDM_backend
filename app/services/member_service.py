@@ -44,7 +44,7 @@ def authenticate_member(
         )
     )
     if member is None:
-        raise ValueError("비밀번호가 틀립니다")
+        raise ValueError("주민번호를 잘못 입력하셨습니다")
 
     if member.is_active != "Y":
         raise ValueError("미사용 등록 사용자 입니다")
