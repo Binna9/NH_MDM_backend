@@ -34,3 +34,16 @@ class MemberLoginResponse(BaseModel):
     nh_member_ssn: str
     nh_member_phone: str
     is_active: str
+
+
+class OtpSendRequest(BaseModel):
+    phone: str = Field(min_length=1)
+
+
+class OtpVerifyRequest(BaseModel):
+    phone: str = Field(min_length=1)
+    code: str = Field(min_length=6, max_length=6, pattern=r"^\d{6}$")
+
+
+class OtpVerifyResponse(BaseModel):
+    verified: bool

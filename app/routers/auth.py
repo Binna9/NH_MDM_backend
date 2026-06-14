@@ -2,8 +2,17 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
-from app.schemas.auth import LoginResponse, MemberLoginRequest, MemberLoginResponse, PartnerLoginRequest
+from app.schemas.auth import (
+    LoginResponse,
+    MemberLoginRequest,
+    MemberLoginResponse,
+    OtpSendRequest,
+    OtpVerifyRequest,
+    OtpVerifyResponse,
+    PartnerLoginRequest,
+)
 from app.services.member_service import authenticate_member
+from app.services.otp_service import send_otp, verify_otp
 from app.services.partner_service import authenticate_partner
 
 router = APIRouter(prefix="/auth", tags=["auth"])
@@ -36,3 +45,17 @@ def member_login(payload: MemberLoginRequest, db: Session = Depends(get_db)) -> 
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail=str(e),
         )
+
+
+@router.post("/otp/send", status_code=status.HTTP_204_NO_CONTENT)
+async def otp_send(payload: OtpSendRequest) -> None:
+    try:
+        await send_otp(payload.phone)
+    except ValueError as e:
+        raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=str(e))
+
+
+@router.post("/otp/verify", response_model=OtpVerifyResponse)
+async def otp_verify(payload: OtpVerifyRequest) -> OtpVerifyResponse:
+    verified = await verify_otp(payload.phone, payload.code)
+    return OtpVerifyResponse(verified=verified)

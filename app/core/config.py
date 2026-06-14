@@ -13,6 +13,14 @@ class Settings(BaseSettings):
     kakao_redirect_uri: str = ""
     kakao_client_secret: str = ""
 
+    solapi_api_key: str = ""
+    solapi_api_secret: str = ""
+    solapi_sender_phone: str = ""
+
+    redis_url: str = "redis://localhost:6379/0"
+
+    otp_ttl_seconds: int = 600  # 10분
+
     jwt_secret_key: str = "change-me"
     jwt_algorithm: str = "HS256"
 

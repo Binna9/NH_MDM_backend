@@ -7,3 +7,5 @@ psycopg[binary]
 openpyxl
 python-multipart
 PyJWT
+redis
+solapi
