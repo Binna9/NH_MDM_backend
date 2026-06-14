@@ -39,7 +39,7 @@ async def send_otp(phone: str) -> None:
         service.send(RequestMessage(
             from_=settings.solapi_sender_phone,
             to=phone,
-            text=f"[NH MDM] 농협축산 조합원 인증번호 [{code}]를 입력해주세요. 감사합니다",
+            text=f"[NH MDM] 고양축산농협 조합원 인증번호 [{code}]를 입력해주세요. 감사합니다.",
         ))
     except Exception:
         await redis.delete(key)
