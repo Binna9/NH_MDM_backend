@@ -31,3 +31,6 @@ class MemberLoginResponse(BaseModel):
     nh_member_id: str
     nh_member_name: str
     nh_customer_no: str
+    nh_member_ssn: str
+    nh_member_phone: str
+    is_active: str

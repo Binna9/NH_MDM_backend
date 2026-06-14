@@ -28,17 +28,26 @@ def authenticate_member(
     nh_member_name: str,
     ssn_front: str,
     ssn_back: str,
-) -> MemberLoginResponse | None:
+) -> MemberLoginResponse:
     ssn = f"{ssn_front}-{ssn_back}"
+
+    member_by_name = db.scalar(
+        select(NhMemberInfo).where(NhMemberInfo.nh_member_name == nh_member_name.strip())
+    )
+    if member_by_name is None:
+        raise ValueError("등록된 성명이 없습니다")
+
     member = db.scalar(
         select(NhMemberInfo).where(
             NhMemberInfo.nh_member_name == nh_member_name.strip(),
             NhMemberInfo.nh_member_ssn == ssn,
-            NhMemberInfo.is_active == "Y",
         )
     )
     if member is None:
-        return None
+        raise ValueError("비밀번호가 틀립니다")
+
+    if member.is_active != "Y":
+        raise ValueError("미사용 등록 사용자 입니다")
 
     payload = {"sub": member.nh_member_id, "name": member.nh_member_name}
     token = jwt.encode(payload, settings.jwt_secret_key, algorithm=settings.jwt_algorithm)
@@ -48,6 +57,9 @@ def authenticate_member(
         nh_member_id=member.nh_member_id,
         nh_member_name=member.nh_member_name,
         nh_customer_no=member.nh_customer_no,
+        nh_member_ssn=member.nh_member_ssn,
+        nh_member_phone=member.nh_member_phone,
+        is_active=member.is_active,
     )
 
 

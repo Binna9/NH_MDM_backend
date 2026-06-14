@@ -24,17 +24,15 @@ def partner_login(payload: PartnerLoginRequest) -> LoginResponse:
 
 @router.post("/member-login", response_model=MemberLoginResponse)
 def member_login(payload: MemberLoginRequest, db: Session = Depends(get_db)) -> MemberLoginResponse:
-    login_response = authenticate_member(
-        db,
-        nh_member_name=payload.nh_member_name,
-        ssn_front=payload.ssn_front,
-        ssn_back=payload.ssn_back,
-    )
-
-    if login_response is None:
+    try:
+        return authenticate_member(
+            db,
+            nh_member_name=payload.nh_member_name,
+            ssn_front=payload.ssn_front,
+            ssn_back=payload.ssn_back,
+        )
+    except ValueError as e:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid member credentials",
+            detail=str(e),
         )
-
-    return login_response
