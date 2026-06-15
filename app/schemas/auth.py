@@ -15,7 +15,7 @@ class MemberLoginRequest(BaseModel):
 
 class KakaoLoginRequest(BaseModel):
     authorization_code: str = Field(min_length=1)
-    redirect_uri: str = Field(min_length=1)
+    redirect_uri: str | None = None
 
 
 class LoginResponse(BaseModel):

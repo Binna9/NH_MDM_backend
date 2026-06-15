@@ -22,6 +22,21 @@ from app.schemas.member import (
 
 settings = get_settings()
 
+def _build_member_login_response(member: NhMemberInfo) -> MemberLoginResponse:
+    payload = {"sub": member.nh_member_id, "name": member.nh_member_name}
+    token = jwt.encode(payload, settings.jwt_secret_key, algorithm=settings.jwt_algorithm)
+
+    return MemberLoginResponse(
+        access_token=token,
+        nh_member_id=member.nh_member_id,
+        nh_member_name=member.nh_member_name,
+        nh_customer_no=member.nh_customer_no,
+        nh_member_ssn=member.nh_member_ssn,
+        nh_member_phone=member.nh_member_phone,
+        is_active=member.is_active,
+    )
+
+
 def authenticate_member(
     db: Session,
     *,
@@ -49,18 +64,29 @@ def authenticate_member(
     if member.is_active != "Y":
         raise ValueError("미사용 등록 사용자 입니다")
 
-    payload = {"sub": member.nh_member_id, "name": member.nh_member_name}
-    token = jwt.encode(payload, settings.jwt_secret_key, algorithm=settings.jwt_algorithm)
+    return _build_member_login_response(member)
 
-    return MemberLoginResponse(
-        access_token=token,
-        nh_member_id=member.nh_member_id,
-        nh_member_name=member.nh_member_name,
-        nh_customer_no=member.nh_customer_no,
-        nh_member_ssn=member.nh_member_ssn,
-        nh_member_phone=member.nh_member_phone,
-        is_active=member.is_active,
+
+def authenticate_member_by_kakao(
+    db: Session,
+    *,
+    nh_member_name: str,
+    ssn_front: str,
+) -> MemberLoginResponse:
+    member_by_name = db.scalar(
+        select(NhMemberInfo).where(NhMemberInfo.nh_member_name == nh_member_name.strip())
     )
+    if member_by_name is None:
+        raise ValueError("등록된 성명이 없습니다")
+
+    stored_ssn_front = member_by_name.nh_member_ssn.split("-", 1)[0]
+    if stored_ssn_front != ssn_front:
+        raise ValueError("주민번호를 잘못 입력하셨습니다")
+
+    if member_by_name.is_active != "Y":
+        raise ValueError("미사용 등록 사용자 입니다")
+
+    return _build_member_login_response(member_by_name)
 
 
 def get_member_by_id(db: Session, nh_member_id: str) -> NhMemberInfo | None:

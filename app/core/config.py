@@ -11,6 +11,7 @@ class Settings(BaseSettings):
 
     kakao_rest_api_key: str = ""
     kakao_redirect_uri: str = ""
+    kakao_app_return_url: str = ""
     kakao_client_secret: str = ""
 
     solapi_api_key: str = ""
